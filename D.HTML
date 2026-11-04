@@ -1,0 +1,484 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スケジュール管理</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, "Meiryo", sans-serif;
+            background-color: #f4f7fb;
+            margin: 0;
+            padding: 25px;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 22px;
+            margin-top: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .box {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 5px #0000000d;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .add-button {
+            background-color: #087cf0;
+            color: white;
+        }
+
+        .add-button:hover {
+            background-color: #0564c2;
+        }
+
+        .month-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .month-header h2 {
+            margin: 0;
+        }
+
+        .month-button {
+            background-color: #087cf0;
+            color: white;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            border-top: 1px solid #ddd;
+            border-left: 1px solid #ddd;
+        }
+
+        .day-name,
+        .day {
+            min-height: 65px;
+            padding: 12px;
+            border-right: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .day-name {
+            min-height: auto;
+            text-align: center;
+            font-weight: bold;
+            background-color: #eaf2ff;
+        }
+
+        .day {
+            cursor: pointer;
+            background-color: white;
+        }
+
+        .day:hover {
+            background-color: #eef6ff;
+        }
+
+        .day.selected {
+            background-color: #fff0a6;
+        }
+
+        .day.today {
+            border: 2px solid #087cf0;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-button {
+            background-color: #087cf0;
+            color: white;
+        }
+
+        .all-button {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .delete-button {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .empty {
+            color: #777;
+            padding: 10px 0;
+        }
+
+        @media (max-width: 650px) {
+            body {
+                padding: 12px;
+            }
+
+            .box {
+                padding: 15px;
+            }
+
+            .day-name,
+            .day {
+                padding: 7px 3px;
+                min-height: 45px;
+                font-size: 13px;
+            }
+
+            .schedule-item {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <h1>スケジュール管理</h1>
+
+    <!-- 予定を追加 -->
+    <section class="box">
+        <h2>予定を追加</h2>
+
+        <div class="form-row">
+            <input type="date" id="date">
+
+            <input type="time" id="time">
+
+            <input
+                type="text"
+                id="title"
+                placeholder="予定のタイトル"
+            >
+
+            <button class="add-button" onclick="addSchedule()">
+                追加する
+            </button>
+        </div>
+    </section>
+
+    <!-- カレンダー -->
+    <section class="box">
+        <div class="month-header">
+            <button class="month-button" onclick="changeMonth(-1)">
+                前の月
+            </button>
+
+            <h2 id="monthTitle"></h2>
+
+            <button class="month-button" onclick="changeMonth(1)">
+                次の月
+            </button>
+        </div>
+
+        <div class="calendar" id="calendar"></div>
+    </section>
+
+    <!-- 予定一覧 -->
+    <section class="box">
+        <h2>予定一覧</h2>
+
+        <div class="filter-row">
+            <input type="date" id="filterDate">
+
+            <button class="filter-button" onclick="filterSchedules()">
+                絞り込む
+            </button>
+
+            <button class="all-button" onclick="showAllSchedules()">
+                すべて表示
+            </button>
+        </div>
+
+        <div id="scheduleList"></div>
+    </section>
+
+</div>
+
+<script>
+    // 表示する月
+    let currentDate = new Date(2026, 10, 1);
+
+    // 選択した日付
+    let selectedDate = "2026-11-04";
+
+    // 最初の予定
+    let schedules = JSON.parse(localStorage.getItem("schedules")) || [
+        {
+            id: 1,
+            date: "2026-11-04",
+            time: "13:00",
+            title: "授業"
+        },
+        {
+            id: 2,
+            date: "2026-11-05",
+            time: "10:00",
+            title: "友達とカフェ"
+        },
+        {
+            id: 3,
+            date: "2026-11-06",
+            time: "15:00",
+            title: "買い物"
+        }
+    ];
+
+    let filterDate = "";
+
+    // 日付を YYYY-MM-DD の形にする
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    }
+
+    // カレンダーを表示する
+    function showCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        document.getElementById("monthTitle").textContent =
+            `${year}年 ${month + 1}月`;
+
+        const calendar = document.getElementById("calendar");
+        calendar.innerHTML = "";
+
+        const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
+
+        weekDays.forEach(day => {
+            const cell = document.createElement("div");
+            cell.className = "day-name";
+            cell.textContent = day;
+            calendar.appendChild(cell);
+        });
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+
+        // 月の最初の日まで空白を入れる
+        for (let i = 0; i < firstDay; i++) {
+            const empty = document.createElement("div");
+            empty.className = "day";
+            calendar.appendChild(empty);
+        }
+
+        // 日付を表示する
+        for (let day = 1; day <= lastDay; day++) {
+            const date = new Date(year, month, day);
+            const dateString = formatDate(date);
+
+            const cell = document.createElement("div");
+            cell.className = "day";
+            cell.textContent = day;
+
+            if (dateString === selectedDate) {
+                cell.classList.add("selected");
+            }
+
+            if (dateString === formatDate(new Date())) {
+                cell.classList.add("today");
+            }
+
+            cell.onclick = function () {
+                selectedDate = dateString;
+                document.getElementById("date").value = dateString;
+                document.getElementById("filterDate").value = dateString;
+
+                showCalendar();
+                filterSchedules();
+            };
+
+            calendar.appendChild(cell);
+        }
+    }
+
+    // 前の月・次の月
+    function changeMonth(amount) {
+        currentDate.setMonth(currentDate.getMonth() + amount);
+        showCalendar();
+    }
+
+    // 予定を追加する
+    function addSchedule() {
+        const date = document.getElementById("date").value;
+        const time = document.getElementById("time").value;
+        const title = document.getElementById("title").value.trim();
+
+        if (!date || !time || !title) {
+            alert("日付、時間、予定のタイトルを入力してください。");
+            return;
+        }
+
+        schedules.push({
+            id: Date.now(),
+            date: date,
+            time: time,
+            title: title
+        });
+
+        saveSchedules();
+
+        selectedDate = date;
+        currentDate = new Date(date + "T12:00:00");
+
+        document.getElementById("title").value = "";
+
+        showCalendar();
+        showAllSchedules();
+    }
+
+    // 予定を保存する
+    function saveSchedules() {
+        localStorage.setItem("schedules", JSON.stringify(schedules));
+    }
+
+    // 予定一覧を表示する
+    function displaySchedules(list) {
+        const scheduleList = document.getElementById("scheduleList");
+        scheduleList.innerHTML = "";
+
+        if (list.length === 0) {
+            scheduleList.innerHTML =
+                '<p class="empty">予定はありません。</p>';
+            return;
+        }
+
+        list.sort((a, b) => {
+            return (a.date + a.time).localeCompare(b.date + b.time);
+        });
+
+        list.forEach(schedule => {
+            const item = document.createElement("div");
+            item.className = "schedule-item";
+
+            const info = document.createElement("span");
+            info.textContent =
+                `${schedule.date} ${schedule.time} ： ${schedule.title}`;
+
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "delete-button";
+            deleteButton.textContent = "削除";
+
+            deleteButton.onclick = function () {
+                deleteSchedule(schedule.id);
+            };
+
+            item.appendChild(info);
+            item.appendChild(deleteButton);
+            scheduleList.appendChild(item);
+        });
+    }
+
+    // 予定を絞り込む
+    function filterSchedules() {
+        filterDate = document.getElementById("filterDate").value;
+
+        if (!filterDate) {
+            alert("絞り込む日付を選んでください。");
+            return;
+        }
+
+        const result = schedules.filter(schedule => {
+            return schedule.date === filterDate;
+        });
+
+        displaySchedules(result);
+    }
+
+    // すべての予定を表示する
+    function showAllSchedules() {
+        filterDate = "";
+        displaySchedules([...schedules]);
+    }
+
+    // 予定を削除する
+    function deleteSchedule(id) {
+        if (!confirm("この予定を削除しますか？")) {
+            return;
+        }
+
+        schedules = schedules.filter(schedule => schedule.id !== id);
+
+        saveSchedules();
+
+        if (filterDate) {
+            filterSchedules();
+        } else {
+            showAllSchedules();
+        }
+    }
+
+    // 最初の表示
+    document.getElementById("date").value = selectedDate;
+    document.getElementById("filterDate").value = selectedDate;
+
+    showCalendar();
+    showAllSchedules();
+</script>
+
+</body>
+</html>
